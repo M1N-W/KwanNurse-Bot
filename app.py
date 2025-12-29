@@ -1,19 +1,15 @@
 from flask import Flask, request, jsonify
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 app = Flask(__name__)
 
 # --- ส่วนตั้งค่า Google Sheets ---
-# เชื่อมต่อกับ Google Sheets
+# เชื่อมต่อกับ Google Sheets (ใช้ google-auth ผ่าน gspread.service_account)
 def save_to_sheet(pain, wound, fever, mobility, risk_result):
     try:
-        # กำหนดขอบเขตการเข้าถึง
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # โหลดกุญแจจากไฟล์ JSON
-        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-        client = gspread.authorize(creds)
+        # สร้าง client จากไฟล์ credentials.json ที่ต้องมีบนเครื่อง/instance
+        client = gspread.service_account(filename='credentials.json')
 
         # เปิดไฟล์ Google Sheet (ต้องตั้งชื่อไฟล์ให้ตรงเป๊ะๆ)
         sheet = client.open('KhwanBot_Data').sheet1
@@ -22,10 +18,11 @@ def save_to_sheet(pain, wound, fever, mobility, risk_result):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         row = [timestamp, pain, wound, fever, mobility, risk_result]
 
-        # บันทึกลงแถวใหม่
-        sheet.append_row(row)
+        # บันทึกลงแถวใหม่ (value_input_option เป็น optional)
+        sheet.append_row(row, value_input_option='USER_ENTERED')
         print("บันทึกข้อมูลสำเร็จ!")
     except Exception as e:
+        # แค่พิมพ์ error เพื่อ debug (ใน production ควรเก็บ log)
         print(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
 
 # --- ส่วนคำนวณความเสี่ยง (Logic เดิมที่ปรับปรุงแล้ว) ---
@@ -98,14 +95,18 @@ def calculate_risk(pain, wound, fever, mobility):
 @app.route('/webhook', methods=['POST'])
 def webhook():
     req = request.get_json(silent=True, force=True)
-    intent_name = req.get('queryResult').get('intent').get('displayName')
+    # ป้องกันกรณี payload ไม่ตรงโครงสร้าง
+    try:
+        intent_name = req.get('queryResult', {}).get('intent', {}).get('displayName')
+    except Exception:
+        intent_name = None
     
     if intent_name == 'ReportSymptoms':
-        parameters = req.get('queryResult').get('parameters')
+        parameters = req.get('queryResult', {}).get('parameters', {})
         pain_score = parameters.get('pain_score')
-        wound_status = parameters.get('wound_status')
-        fever_check = parameters.get('fever_check')
-        mobility_status = parameters.get('mobility_status')
+        wound_status = parameters.get('wound_status', "")
+        fever_check = parameters.get('fever_check', "")
+        mobility_status = parameters.get('mobility_status', "")
         
         reply_text = calculate_risk(pain_score, wound_status, fever_check, mobility_status)
         
@@ -116,4 +117,4 @@ def webhook():
     return jsonify({"fulfillmentText": "ขอโทษค่ะ ระบบขัดข้องชั่วคราว"})
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    app.run(port=5000, debug=True)ue)
