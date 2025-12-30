@@ -17,7 +17,6 @@ def get_sheet_client():
         # ตรวจสอบว่ามีไฟล์ credentials.json หรือไม่
         if not os.path.exists('credentials.json'):
             print("⚠️ Warning: ไม่พบไฟล์ credentials.json (ระบบจะพยายามใช้ Environment Variable)")
-            
         return gspread.service_account(filename='credentials.json')
     except Exception as e:
         print(f"❌ Connect Sheet Error: {e}")
@@ -72,12 +71,24 @@ def calculate_symptom_risk(pain, wound, fever, mobility):
     elif p_val >= 6: risk_score += 1
 
     # Wound Logic
-    if any(x in wound for x in ["หนอง", "มีกลิ่น", "แฉะ"]): risk_score += 3
-    elif any(x in wound for x in ["บวมแดง", "อักเสบ"]): risk_score += 2
+    try:
+        wound_text = str(wound)
+    except:
+        wound_text = ""
+    if any(x in wound_text for x in ["หนอง", "มีกลิ่น", "แฉะ"]): risk_score += 3
+    elif any(x in wound_text for x in ["บวมแดง", "อักเสบ"]): risk_score += 2
 
     # Fever & Mobility Logic
-    if any(x in fever for x in ["มี", "ตัวร้อน"]): risk_score += 2
-    if any(x in mobility for x in ["ไม่ได้", "ติดเตียง"]): risk_score += 1
+    try:
+        fever_text = str(fever)
+    except:
+        fever_text = ""
+    try:
+        mobility_text = str(mobility)
+    except:
+        mobility_text = ""
+    if any(x in fever_text for x in ["มี", "ตัวร้อน"]): risk_score += 2
+    if any(x in mobility_text for x in ["ไม่ได้", "ติดเตียง"]): risk_score += 1
 
     # Evaluation
     if risk_score >= 3:
@@ -118,11 +129,121 @@ def save_profile_data(user_id, age, weight, height, bmi, diseases, risk_level):
     except Exception as e:
         print(f"❌ Save Profile Error: {e}")
 
+# --------- New helper: normalize diseases ----------
+def normalize_diseases(disease_param):
+    """
+    รับค่า disease_param ได้หลายรูปแบบ (None, string, list, list of dicts, dict)
+    คืนค่าเป็น list ของโรคในรูปแบบ canonical (ภาษาไทย) เช่น ["ความดัน", "เบาหวาน"]
+    """
+    if not disease_param:
+        return []
+
+    # helper: แปลง input เป็นรายการของ raw strings
+    def extract_items(param):
+        items = []
+        if isinstance(param, list):
+            raw = param
+        else:
+            raw = [param]
+        for it in raw:
+            if it is None:
+                continue
+            if isinstance(it, dict):
+                # Dialogflow บางเวอร์ชันส่ง object เช่น {'name': 'hypertension'} หรือ {'value':'hypertension'}
+                v = it.get('name') or it.get('value') or it.get('original') or it.get('displayName') if isinstance(it, dict) else None
+                if not v:
+                    # fallback stringify
+                    try:
+                        v = json.dumps(it, ensure_ascii=False)
+                    except:
+                        v = str(it)
+            else:
+                v = str(it)
+            v = v.strip()
+            if v:
+                items.append(v)
+        return items
+
+    raw_items = extract_items(disease_param)
+    # mapping ของคำต่าง ๆ -> canonical ไทย
+    mapping = {
+        # อังกฤษ -> ไทย
+        "hypertension": "ความดัน",
+        "high blood pressure": "ความดัน",
+        "high blood-pressure": "ความดัน",
+        "blood pressure": "ความดัน",
+        "diabetes": "เบาหวาน",
+        "type 1 diabetes": "เบาหวาน",
+        "type 2 diabetes": "เบาหวาน",
+        "t2d": "เบาหวาน",
+        "cancer": "มะเร็ง",
+        "tumor": "มะเร็ง",
+        "malignant": "มะเร็ง",
+        "kidney": "ไต",
+        "renal": "ไต",
+        "heart": "หัวใจ",
+        "cardiac": "หัวใจ",
+        # ไทย
+        "ความดัน": "ความดัน",
+        "เบาหวาน": "เบาหวาน",
+        "มะเร็ง": "มะเร็ง",
+        "ไต": "ไต",
+        "หัวใจ": "หัวใจ",
+        # บางคำย่อ/สำนวน
+        "ht": "ความดัน",
+        "dm": "เบาหวาน",
+    }
+    # คำที่แปลว่า "ไม่มีโรค"
+    negatives = {"none", "no", "no disease", "ไม่มี", "ไม่มีโรค", "healthy", "null", "n/a", "ไม่"}
+
+    normalized = []
+    seen = set()
+
+    for raw in raw_items:
+        s = raw.lower().strip()
+        # ข้ามคำที่แปลว่าไม่มีโรค
+        if s in negatives or any(neg in s for neg in ["no disease", "ไม่มี"]):
+            continue
+
+        found = False
+        # ตรวจหา exact match หรือ partial match กับ key ใน mapping
+        # เรียงตรวจ key ที่ยาวก่อน (เพื่อป้องกัน match กับคำสั้นก่อน)
+        for key in sorted(mapping.keys(), key=lambda x: -len(x)):
+            if key in s:
+                canon = mapping[key]
+                if canon not in seen:
+                    normalized.append(canon)
+                    seen.add(canon)
+                found = True
+                break
+        if not found:
+            # ถ้าไม่เจอ mapping ให้เอาค่าเดิม (แปลงเป็น title แบบเรียบร้อย)
+            candidate = raw.strip()
+            if candidate and candidate not in seen:
+                normalized.append(candidate)
+                seen.add(candidate)
+
+    return normalized
+
+# -----------------------------------------------
+
 def calculate_personal_risk(user_id, age, weight, height, disease):
     risk_score = 0
     risk_level = "ต่ำ"
     bmi = 0
     message = ""
+
+    # Debug log (ช่วยดูรูปแบบ params ที่รับมา)
+    try:
+        print("DEBUG calculate_personal_risk params:", json.dumps({
+            "user_id": user_id,
+            "age": age,
+            "weight": weight,
+            "height": height,
+            "disease_raw": disease
+        }, ensure_ascii=False))
+    except Exception:
+        print("DEBUG calculate_personal_risk params (non-jsonifiable)")
 
     # 1. แปลงค่าตัวเลข
     try:
@@ -134,20 +255,25 @@ def calculate_personal_risk(user_id, age, weight, height, disease):
             bmi = weight / (height_m ** 2)
     except:
         age = 0
-        bmi = 0
+        bmi = 0.0
 
     # 2. Scoring System
-    if age >= 60: risk_score += 1
+    if age >= 60:
+        risk_score += 1
     
-    if bmi >= 30: risk_score += 1
-    elif bmi > 0 and bmi < 18.5: risk_score += 1 
+    if bmi >= 30:
+        risk_score += 1
+    elif bmi > 0 and bmi < 18.5:
+        risk_score += 1 
 
-    disease_list = ["เบาหวาน", "หัวใจ", "ความดัน", "ไต", "มะเร็ง"]
-    # แปลง input เป็น string เพื่อเช็ค (เผื่อ Dialogflow ส่งมาเป็น list)
-    disease_str = str(disease)
-    if any(d in disease_str for d in disease_list):
-        risk_score += 2 
-    
+    # Normalize disease input and score
+    disease_normalized = normalize_diseases(disease)
+    print("DEBUG normalized diseases:", disease_normalized)
+
+    risk_diseases = {"เบาหวาน", "หัวใจ", "ความดัน", "ไต", "มะเร็ง"}
+    if any(d in risk_diseases for d in disease_normalized):
+        risk_score += 2
+
     # 3. Triage
     if risk_score >= 4:
         risk_level = "สูง (High Risk)"
@@ -162,23 +288,30 @@ def calculate_personal_risk(user_id, age, weight, height, disease):
         desc = "ความเสี่ยงเกณฑ์ปกติ"
         advice = "ปฏิบัติตัวตามคำแนะนำทั่วไปได้เลยค่ะ"
 
+    # เตรียมข้อความแสดงโรคให้สวย
+    diseases_str = ", ".join(disease_normalized) if disease_normalized else "ไม่มีโรคประจำตัว"
+
     # สร้างข้อความตอบกลับ
     message = (
         f"📊 ผลประเมินความเสี่ยงของคุณ\n"
         f"---------------------------\n"
         f"👤 ข้อมูล: อายุ {age}, BMI {bmi:.1f}\n"
-        f"🏥 โรค: {disease}\n"
+        f"🏥 โรค: {diseases_str}\n"
         f"⚠️ ระดับ: {risk_level}\n"
         f"({desc})\n"
         f"💡 {advice}"
     )
 
     # 4. 🔥 บันทึกข้อมูลลง Sheet (สำคัญมาก!)
-    save_profile_data(user_id, age, weight, height, bmi, disease, risk_level)
+    # ส่ง diseases เป็น list เพื่อให้ save_profile_data แปลงเป็น string ได้สวย
+    try:
+        save_profile_data(user_id, age, weight, height, bmi, disease_normalized, risk_level)
+    except Exception as e:
+        print(f"❌ Error saving profile: {e}")
 
     # 5. แจ้งเตือนพยาบาลกรณีเสี่ยงสูง
     if risk_score >= 4:
-        notify_msg = f"🆕 ผู้ป่วยใหม่ (เสี่ยงสูง)\nUser: {user_id}\nอายุ {age}, โรค {disease}\nโปรดวางแผนเยี่ยมบ้าน"
+        notify_msg = f"🆕 ผู้ป่วยใหม่ (เสี่ยงสูง)\nUser: {user_id}\nอายุ {age}, โรค {diseases_str}\nโปรดวางแผนเยี่ยมบ้าน"
         send_line_push(notify_msg)
 
     return message
@@ -202,6 +335,11 @@ def webhook():
         return jsonify({"fulfillmentText": "Error parsing request"})
 
     print(f"🔔 Intent Incoming: {intent}")
+    # temporary debug print of params
+    try:
+        print("DEBUG params:", json.dumps(params, ensure_ascii=False))
+    except Exception:
+        print("DEBUG params (non-jsonifiable)")
 
     # --- ROUTING ---
     
