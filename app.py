@@ -100,6 +100,21 @@ def webhook():
         intent_name = req.get('queryResult', {}).get('intent', {}).get('displayName')
     except Exception:
         intent_name = None
+    # (ใส่ไว้ในฟังก์ชัน webhook ก่อนบรรทัด if intent_name == ...)
+    
+    # --- โค้ดสำหรับหา Group ID (ใช้เสร็จแล้วลบออกได้) ---
+    try:
+        # เช็คว่าข้อความมาจากกลุ่มไลน์ไหม
+        source = req.get('originalDetectIntentRequest', {}).get('payload', {}).get('data', {}).get('source', {})
+        if source.get('type') == 'group' or source.get('type') == 'room':
+            group_id = source.get('groupId') or source.get('roomId')
+            # ถ้าพิมพ์คำว่า "check id" ในกลุ่ม บอทจะบอก ID กลับมา
+            user_text = req.get('queryResult').get('queryText')
+            if user_text == "check id":
+                return jsonify({"fulfillmentText": f"Group ID ของห้องนี้คือ: {group_id}"})
+    except Exception as e:
+        print(f"Error finding group ID: {e}")
+    # ------------------------------------------------
     
     if intent_name == 'ReportSymptoms':
         parameters = req.get('queryResult', {}).get('parameters', {})
@@ -118,3 +133,4 @@ def webhook():
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
+
