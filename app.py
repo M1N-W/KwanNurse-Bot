@@ -95,7 +95,7 @@ def calculate_symptom_risk(pain, wound, fever, mobility):
         risk_level = "สูง (อันตราย)"
         msg = f"⚠️ เสี่ยง{risk_level} (คะแนน {risk_score})\nกรุณากดปุ่ม 'ติดต่อพยาบาล' ทันที"
         # Alert Nurse
-        notify_msg = f"🚨 DAILY REPORT (อาการแย่)\nRisk: {risk_score}\nPain: {pain}\nWound: {wound}\nCheck ASAP!"
+        notify_msg = f"🚨 DAILY REPORT (อาการแย่)\nRisk: {risk_score}\nPain: {pain}\nWound: {wound}\nกรุณาตรวจสอบทันที!"
         send_line_push(notify_msg)
     elif risk_score >= 2:
         risk_level = "ปานกลาง"
@@ -372,3 +372,4 @@ def webhook():
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
+
