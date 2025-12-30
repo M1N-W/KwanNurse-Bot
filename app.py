@@ -94,7 +94,7 @@ def save_symptom_data(user_id, pain, wound, fever, mobility, risk_result):
     try:
         client = get_sheet_client()
         if client:
-            sheet = client.open('KhwanBot_Data').sheet1
+            sheet = client.open('KhwanBot_Data').worksheet('SymptomLog')
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             sheet.append_row([timestamp, user_id, pain, wound, fever, mobility, risk_result], value_input_option='USER_ENTERED')
             logger.info("Symptom Saved for user=%s", user_id)
@@ -410,3 +410,4 @@ if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     host = os.environ.get("HOST", "0.0.0.0")
     app.run(host=host, port=port, debug=DEBUG)
+
