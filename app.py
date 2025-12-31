@@ -17,25 +17,23 @@ from zoneinfo import ZoneInfo
 # ---------- App config ----------
 app = Flask(__name__)
 DEBUG = os.environ.get("DEBUG", "false").lower() in ("1", "true", "yes")
-logging.basicConfig(level=logging.DEBUG if DEBUG else logging.INFO,
+logging.basicConfig(level=logging. DEBUG if DEBUG else logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 LOCAL_TZ = ZoneInfo("Asia/Bangkok")
 WORKSHEET_LINK = os.environ.get("WORKSHEET_LINK", "https://docs.google.com/spreadsheets/d/1Jteh4XLzgQM3YKMzUeW3PGuBjUkvnS61rm2IXfGPnPo/edit?usp=sharing")
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("CHANNEL_ACCESS_TOKEN")
-NURSE_GROUP_ID = os.environ.get("NURSE_GROUP_ID")  # set this to group ID for push notifications
+NURSE_GROUP_ID = os.environ.get("NURSE_GROUP_ID")
 
 # ---------- gspread helper ----------
 def get_sheet_client():
     try:
-        creds_env = os.environ.get("GSPREAD_CREDENTIALS")
+        creds_env = os.environ. get("GSPREAD_CREDENTIALS")
         if creds_env:
             creds_json = json.loads(creds_env)
-            # some gspread versions have service_account_from_dict
             if hasattr(gspread, "service_account_from_dict"):
-                return gspread.service_account_from_dict(creds_json)
-            # fallback: write temp file (if allowed) or raise
+                return gspread. service_account_from_dict(creds_json)
         if os.path.exists("credentials.json"):
             return gspread.service_account(filename="credentials.json")
         logger.warning("No Google credentials found (credentials.json or GSPREAD_CREDENTIALS).")
@@ -61,19 +59,17 @@ def send_line_push(message):
         else:
             logger.error("LINE push failed: %s %s", resp.status_code, resp.text)
             return False
-    except Exception:
+    except Exception: 
         logger.exception("Push Error")
         return False
 
 # ---------- Helpers for date/time/phone ----------
-def parse_date_iso(s: str):
-    """Validate YYYY-MM-DD -> datetime.date or None. Accept '2026-02-22T00:00:00Z' too."""
+def parse_date_iso(s:  str):
+    """Validate YYYY-MM-DD -> datetime. date or None.  Accept '2026-02-22T00:00:00Z' too."""
     if not s:
         return None
     try:
-        # if Dialogflow sends dict/string etc, ensure str
         if isinstance(s, dict):
-            # try common keys
             for k in ("date", "value", "original"):
                 if k in s and isinstance(s[k], str):
                     s = s[k]
@@ -81,10 +77,9 @@ def parse_date_iso(s: str):
             else:
                 s = json.dumps(s, ensure_ascii=False)
         s2 = str(s).split("T")[0]
-        return datetime.strptime(s2.strip(), "%Y-%m-%d").date()
+        return datetime.strptime(s2. strip(), "%Y-%m-%d").date()
     except Exception:
         try:
-            # try to find a date substring
             m = re.search(r'(\d{4}-\d{2}-\d{2})', str(s))
             if m:
                 return datetime.strptime(m.group(1), "%Y-%m-%d").date()
@@ -96,25 +91,21 @@ def parse_time_hhmm(s: str):
     """Normalize various time shapes into 'HH:MM' or None."""
     if not s:
         return None
-    try:
+    try: 
         if isinstance(s, dict):
-            # Dialogflow may send dicts in some locales; stringify
             s = json.dumps(s, ensure_ascii=False)
         s = str(s).strip()
-        # If contains 'T' and time part e.g. 2026-02-22T09:00:00
         if "T" in s:
             parts = s.split("T")[-1]
             s = parts
-        # time like 09:00:00 or 09:00
         parts = s.split(":")
-        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+        if len(parts) >= 2 and parts[0]. isdigit() and parts[1].isdigit():
             h = int(parts[0]) % 24
             m = int(parts[1]) % 60
             return f"{h:02d}:{m:02d}"
-        # fallback: find HH:MM via regex
-        m = re.search(r'(\d{1,2}[:.]\d{2})', s)
+        m = re.search(r'(\d{1,2}[:. ]\d{2})', s)
         if m:
-            txt = m.group(1).replace('.', ':')
+            txt = m.group(1).replace('. ', ': ')
             ph = txt.split(':')
             h = int(ph[0]) % 24
             m2 = int(ph[1]) % 60
@@ -123,15 +114,13 @@ def parse_time_hhmm(s: str):
         logger.exception("parse_time_hhmm error")
     return None
 
-# mapping for time-of-day canonical -> default HH:MM
 TIME_OF_DAY_MAP = {
     "morning": "09:00",
     "late_morning": "10:30",
     "noon": "12:00",
     "afternoon": "14:00",
-    "evening": "18:00",
+    "evening":  "18:00",
     "night": "20:00",
-    # also allow thai keys if Dialogflow returns thai text for custom entity
     "เช้า": "09:00",
     "สาย": "10:30",
     "เที่ยง": "12:00",
@@ -147,21 +136,17 @@ def resolve_time_from_params(sys_time_param, timeofday_param):
         return t
     if not timeofday_param:
         return None
-    # timeofday_param may be dict or string; normalize
     if isinstance(timeofday_param, dict):
-        # try value/name keys
         for k in ("value", "name", "original", "displayName"):
-            if k in timeofday_param:
+            if k in timeofday_param: 
                 timeofday_param = timeofday_param[k]
                 break
-        else:
+        else: 
             timeofday_param = json.dumps(timeofday_param, ensure_ascii=False)
     if isinstance(timeofday_param, str):
         key = timeofday_param.strip().lower()
-        # map a few thai variants to canonical
-        if key in TIME_OF_DAY_MAP:
+        if key in TIME_OF_DAY_MAP: 
             return TIME_OF_DAY_MAP[key]
-        # try english keywords
         if "morning" in key:
             return TIME_OF_DAY_MAP["morning"]
         if "afternoon" in key or "pm" in key:
@@ -176,24 +161,22 @@ def normalize_phone_number(raw: str):
         return None
     s = str(raw).strip()
     s = re.sub(r"[^\d+]", "", s)
-    if s.startswith("+"):
+    if s. startswith("+"):
         if s.startswith("+66"):
             s = "0" + s[3:]
         else:
-            # other country code: just remove + for now
-            s = s.lstrip("+")
+            s = s. lstrip("+")
     elif s.startswith("66") and len(s) > 2:
         s = "0" + s[2:]
-    # now s should be digits starting with 0 or other
     return s
 
 def is_valid_thai_mobile(s: str):
-    """Basic check: 10 digits starting with 0 and second digit 6-9 (typical mobile)"""
+    """Basic check:  10 digits starting with 0 and second digit 6-9 (typical mobile)"""
     if not s:
         return False
     if not s.isdigit():
         return False
-    return len(s) == 10 and s.startswith("0") and s[1] in "6789"
+    return len(s) == 10 and s. startswith("0") and s[1] in "6789"
 
 # ---------- Sheet saves ----------
 def save_appointment_to_sheet(user_id, name, phone, preferred_date, preferred_time, reason, status="New", assigned_to="", notes=""):
@@ -208,15 +191,15 @@ def save_appointment_to_sheet(user_id, name, phone, preferred_date, preferred_ti
         sheet.append_row(row, value_input_option="USER_ENTERED")
         logger.info("Saved appointment row for user %s", user_id)
         return True
-    except Exception:
+    except Exception: 
         logger.exception("Error saving appointment to sheet")
         return False
 
 def build_appointment_notification(user_id, preferred_date, preferred_time, reason):
     sheet_link = WORKSHEET_LINK
-    return f"นัดใหม่ — user: {user_id}\nวันที่: {preferred_date} เวลา: {preferred_time}\nเรื่อง: {reason}\nดู sheet: {sheet_link}"
+    return f"นัดใหม่ — user:  {user_id}\nวันที่:  {preferred_date} เวลา: {preferred_time}\nเรื่อง: {reason}\nดู sheet: {sheet_link}"
 
-# ---------- Symptom & Personal Risk logic (kept as before) ----------
+# ---------- Symptom & Personal Risk logic ----------
 def save_symptom_data(pain, wound, fever, mobility, risk_result):
     try:
         client = get_sheet_client()
@@ -232,7 +215,7 @@ def calculate_symptom_risk(pain, wound, fever, mobility):
     risk_score = 0
     try:
         p_val = int(pain) if pain is not None and str(pain).strip() != "" else 0
-    except:
+    except: 
         p_val = 0
     if p_val >= 8:
         risk_score += 3
@@ -252,27 +235,25 @@ def calculate_symptom_risk(pain, wound, fever, mobility):
     if risk_score >= 3:
         risk_level = "สูง (อันตราย)"
         msg = f"⚠️ เสี่ยง{risk_level} (คะแนน {risk_score})\nกรุณากดปุ่ม 'ติดต่อพยาบาล' ทันที"
-        notify_msg = f"🚨 DAILY REPORT (อาการแย่)\nRisk: {risk_score}\nPain: {pain}\nWound: {wound}\nกรุณาตรวจสอบทันที!"
+        notify_msg = f"🚨 DAILY REPORT (อาการแย่)\nRisk:  {risk_score}\nPain: {pain}\nWound: {wound}\nกรุณาตรวจสอบทันที!"
         send_line_push(notify_msg)
     elif risk_score >= 2:
         risk_level = "ปานกลาง"
-        msg = f"⚠️ เสี่ยง{risk_level} (คะแนน {risk_score})\nเฝ้าระวังอาการใกล้ชิด 24 ชม.นะคะ"
+        msg = f"⚠️ เสี่ยง{risk_level} (คะแนน {risk_score})\nเฝ้าระวังอาการใกล้ชิด 24 ชม.  เป็นการดีค่ะ"
     elif risk_score == 1:
         risk_level = "ต่ำ (เฝ้าระวัง)"
         msg = f"🟡 เสี่ยง{risk_level}\nโดยรวมปกติดี แต่ต้องสังเกตอาการนะคะ"
-    else:
+    else: 
         risk_level = "ต่ำ (ปกติ)"
         msg = f"✅ เสี่ยง{risk_level}\nแผลหายดี ยอดเยี่ยมมากค่ะ"
     save_symptom_data(pain, wound, fever, mobility, risk_level)
     return msg
 
-# normalize_diseases, save_profile_data, calculate_personal_risk
-# (copy the earlier functions unchanged for brevity — include them if needed)
 def normalize_diseases(disease_param):
-    # same as previous block (omitted here to keep snippet shorter)
-    # include your full normalize_diseases implementation from earlier
+    """Extract and normalize disease/condition names from various formats."""
     if not disease_param:
         return []
+    
     def extract_items(param):
         items = []
         if isinstance(param, list):
@@ -287,7 +268,7 @@ def normalize_diseases(disease_param):
                 if not v:
                     try:
                         v = json.dumps(it, ensure_ascii=False)
-                    except:
+                    except: 
                         v = str(it)
             else:
                 v = str(it)
@@ -302,7 +283,7 @@ def normalize_diseases(disease_param):
         "diabetes": "เบาหวาน", "type 1 diabetes": "เบาหวาน", "type 2 diabetes": "เบาหวาน", "t2d": "เบาหวาน",
         "cancer": "มะเร็ง", "tumor": "มะเร็ง", "kidney": "ไต", "renal": "ไต",
         "heart": "หัวใจ", "cardiac": "หัวใจ",
-        "ความดัน": "ความดัน", "เบาหวาน": "เบาหวาน", "มะเร็ง": "มะเร็ง", "ไต": "ไต", "หัวใจ": "หัวใจ",
+        "ความดัน": "ความดัน", "เบาหวาน": "เบาหวาน", "มะเร็ง": "มะเร็ง", "ไต": "ไต", "หัวใจ":  "หัวใจ",
         "ht": "ความดัน", "dm": "เบาหวาน",
     }
     negatives = {"none", "no", "no disease", "ไม่มี", "ไม่มีโรค", "healthy", "null", "n/a", "ไม่"}
@@ -322,10 +303,10 @@ def normalize_diseases(disease_param):
                 found = True
                 break
         if not found:
-            candidate = raw.strip()
+            candidate = raw. strip()
             if candidate and candidate not in seen:
-                normalized.append(candidate)
-                seen.add(candidate)
+                normalized. append(candidate)
+                seen. add(candidate)
     return normalized
 
 def save_profile_data(user_id, age, weight, height, bmi, diseases, risk_level):
@@ -337,11 +318,11 @@ def save_profile_data(user_id, age, weight, height, bmi, diseases, risk_level):
             diseases_str = ", ".join(diseases) if isinstance(diseases, list) else str(diseases)
             sheet.append_row([timestamp, user_id, age, weight, height, bmi, diseases_str, risk_level], value_input_option='USER_ENTERED')
             logger.info("Profile Saved")
-    except Exception:
+    except Exception: 
         logger.exception("Save Profile Error")
 
 def calculate_personal_risk(user_id, age, weight, height, disease):
-    # use same implementation from earlier (kept unchanged)
+    """Calculate personal health risk based on age, BMI, and diseases."""
     risk_score = 0
     bmi = 0.0
     try:
@@ -350,7 +331,7 @@ def calculate_personal_risk(user_id, age, weight, height, disease):
         age_val = None
     try:
         weight_val = float(weight) if weight is not None and str(weight).strip() != "" else None
-    except:
+    except: 
         weight_val = None
     try:
         height_cm = float(height) if height is not None and str(height).strip() != "" else None
@@ -364,7 +345,7 @@ def calculate_personal_risk(user_id, age, weight, height, disease):
         bmi = 0.0
     if age_val is not None and age_val >= 60:
         risk_score += 1
-    if bmi >= 30:
+    if bmi >= 30: 
         risk_score += 1
     elif bmi > 0 and bmi < 18.5:
         risk_score += 1
@@ -391,7 +372,7 @@ def calculate_personal_risk(user_id, age, weight, height, disease):
         f"---------------------------\n"
         f"👤 ข้อมูล: อายุ {age_val if age_val is not None else '-'}, BMI {bmi:.1f}\n"
         f"🏥 โรค: {diseases_str}\n"
-        f"⚠️ ระดับ: {risk_level}\n"
+        f"⚠️ ระดับ:  {risk_level}\n"
         f"({desc})\n"
         f"💡 {advice}"
     )
@@ -400,7 +381,7 @@ def calculate_personal_risk(user_id, age, weight, height, disease):
     except Exception:
         logger.exception("Error saving profile")
     if risk_score >= 4:
-        notify_msg = f"🆕 ผู้ป่วยใหม่ (เสี่ยงสูง)\nUser: {user_id}\nอายุ {age_val}, โรค {diseases_str}\nโปรดวางแผนเยี่ยมบ้าน"
+        notify_msg = f"🆕 ผู้ป่วยใหม่ (เสี่ยงสูง)\nUser: {user_id}\nอายุ {age_val}, โรค {diseases_str}\nโปรดวางแผนเยี่ยม"
         send_line_push(notify_msg)
     return message
 
@@ -413,7 +394,7 @@ def webhook():
     try:
         intent = req.get('queryResult', {}).get('intent', {}).get('displayName')
         params = req.get('queryResult', {}).get('parameters', {}) or {}
-        original_req = req.get('originalDetectIntentRequest', {}) or {}
+        original_req = req. get('originalDetectIntentRequest', {}) or {}
         user_id = req.get('session', 'unknown').split('/')[-1]
     except Exception:
         logger.exception("Parse Error")
@@ -425,7 +406,6 @@ def webhook():
     if intent == 'RequestAppointment':
         preferred_date_raw = params.get('date') or params.get('preferred_date') or params.get('date-original')
         preferred_time_raw = params.get('time') or params.get('preferred_time')
-        # support custom TimeOfDay entity -> param name could be 'timeofday'
         timeofday_raw = params.get('timeofday') or params.get('time_of_day')
         reason = params.get('reason') or params.get('symptom') or params.get('description')
         name = params.get('name') or None
@@ -434,27 +414,23 @@ def webhook():
         preferred_date = parse_date_iso(preferred_date_raw)
         preferred_time = resolve_time_from_params(preferred_time_raw, timeofday_raw)
 
-        # validate date/time/reason
         missing = []
         if not preferred_date:
             missing.append("วันที่ (รูปแบบ YYYY-MM-DD)")
         else:
-            # check not in past (compare with LOCAL_TZ date)
             today_local = datetime.now(tz=LOCAL_TZ).date()
             if preferred_date < today_local:
                 return jsonify({"fulfillmentText": "วันที่ที่เลือกเป็นอดีต กรุณาเลือกวันที่ในอนาคต"}), 200
 
-        if not preferred_time:
+        if not preferred_time: 
             missing.append("เวลา (รูปแบบ HH:MM เช่น 09:00 หรือ 'เช้า'/'บ่าย')")
 
         if not reason:
             missing.append("เหตุผลการนัด (สั้น ๆ)")
 
-        # normalize phone if present
         phone_norm = normalize_phone_number(phone_raw) if phone_raw else None
         if phone_norm and not is_valid_thai_mobile(phone_norm):
-            # we don't require phone, but if provided and invalid, ask user to correct
-            return jsonify({"fulfillmentText": "เบอร์โทรที่ให้มาไม่ถูกต้อง กรุณาพิมพ์ใหม่เป็นตัวเลข 10 หลัก เช่น 0812345678"}), 200
+            return jsonify({"fulfillmentText":  "เบอร์โทรที่ให้มาไม่ถูกต้อง กรุณาพิมพ์ใหม่เป็นตัวเลข 10 หลัก"}), 200
 
         if missing:
             ask = "กรุณาระบุ " + " และ ".join(missing) + " ด้วยครับ"
@@ -467,9 +443,9 @@ def webhook():
         if ok:
             notif = build_appointment_notification(user_id, pd_str, pt_str, reason)
             send_line_push(notif)
-            return jsonify({"fulfillmentText": "รับเรื่องเรียบร้อยแล้ว ทีมพยาบาลจะติดต่อกลับเพื่อยืนยันครับ"}), 200
+            return jsonify({"fulfillmentText": "รับเรื่องเรียบร้อยแล้ว ทีมพยาบาลจะติดต่อกลับเพื่อยืนยันวันเวลาค่ะ"}), 200
         else:
-            return jsonify({"fulfillmentText": "เกิดปัญหาในการบันทึก ขออภัย ลองใหม่อีกครั้งภายหลัง"}), 200
+            return jsonify({"fulfillmentText":  "เกิดปัญหาในการบันทึก ขออภัย ลองใหม่อีกครั้งภายหลัง"}), 200
 
     # --- Symptom intent ---
     if intent == 'ReportSymptoms':
@@ -490,10 +466,10 @@ def webhook():
             params.get('height'),
             params.get('disease')
         )
-        return jsonify({"fulfillmentText": res}), 200
+        return jsonify({"fulfillmentText":  res}), 200
 
     elif intent == 'GetGroupID':
-        return jsonify({"fulfillmentText": f"ID: {os.environ.get('NURSE_GROUP_ID', 'Not Set')}"})
+        return jsonify({"fulfillmentText": f"ID:  {os.environ.get('NURSE_GROUP_ID', 'Not Set')}"})
 
     # fallback
     return jsonify({"fulfillmentText": "ขอโทษค่ะ บอทไม่เข้าใจคำสั่งนี้"}), 200
