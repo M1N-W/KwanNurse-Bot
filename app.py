@@ -386,6 +386,16 @@ def calculate_personal_risk(user_id, age, weight, height, disease):
     return message
 
 # ---------- Dialogflow webhook ----------
+@app.route('/', methods=['GET', 'HEAD'])
+def health_check():
+    """Health check endpoint for UptimeRobot and monitoring services"""
+    return jsonify({
+        "status": "ok",
+        "service": "KwanNurse-Bot",
+        "version": "2.0",
+        "timestamp": datetime.now(tz=LOCAL_TZ).isoformat()
+    }), 200
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     req = request.get_json(silent=True, force=True)
@@ -458,21 +468,23 @@ def webhook():
         return jsonify({"fulfillmentText": res}), 200
 
     # --- Personal risk ---
-    elif intent == 'AssessPersonalRisk':
+    elif intent == 'AssessPersonalRisk' or intent == 'AssessRisk':
+        # Support both intent names for compatibility
         res = calculate_personal_risk(
             user_id,
             params.get('age'),
             params.get('weight'),
             params.get('height'),
-            params.get('disease')
+            params.get('disease') or params.get('diseases')  # Support both parameter names
         )
         return jsonify({"fulfillmentText":  res}), 200
 
     elif intent == 'GetGroupID':
         return jsonify({"fulfillmentText": f"ID:  {os.environ.get('NURSE_GROUP_ID', 'Not Set')}"})
 
-    # fallback
-    return jsonify({"fulfillmentText": "ขอโทษค่ะ บอทไม่เข้าใจคำสั่งนี้"}), 200
+    # fallback - log unhandled intent for debugging
+    logger.warning("Unhandled intent: %s with params: %s", intent, json.dumps(params, ensure_ascii=False))
+    return jsonify({"fulfillmentText": f"ขอโทษค่ะ บอทยังไม่รองรับคำสั่ง '{intent}' ในขณะนี้"}), 200
 
 # ---------- Run ----------
 if __name__ == '__main__':
