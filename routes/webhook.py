@@ -17,7 +17,13 @@ from utils import (
 from services import (
     calculate_symptom_risk,
     calculate_personal_risk,
-    create_appointment
+    create_appointment,
+    get_knowledge_menu,
+    get_wound_care_guide,
+    get_physical_therapy_guide,
+    get_dvt_prevention_guide,
+    get_medication_guide,
+    get_warning_signs_guide
 )
 
 logger = get_logger(__name__)
@@ -33,7 +39,7 @@ def register_routes(app):
             "status": "ok",
             "service": "KwanNurse-Bot v3.0",
             "version": "3.0 - Perfect Core (Refactored)",
-            "features": ["ReportSymptoms", "AssessRisk", "RequestAppointment"],
+            "features": ["ReportSymptoms", "AssessRisk", "RequestAppointment", "GetKnowledge"],
             "timestamp": datetime.now(tz=LOCAL_TZ).isoformat()
         }), 200
     
@@ -66,6 +72,9 @@ def register_routes(app):
         
         elif intent == 'RequestAppointment':
             return handle_request_appointment(user_id, params)
+        
+        elif intent == 'GetKnowledge':
+            return handle_get_knowledge(params)
         
         elif intent == 'GetGroupID':
             return handle_get_group_id()
@@ -184,6 +193,61 @@ def handle_request_appointment(user_id, params):
     return jsonify({"fulfillmentText": message}), 200
 
 
+def handle_get_knowledge(params):
+    """Handle GetKnowledge intent"""
+    topic = params.get('topic') or params.get('knowledge_topic')
+    
+    # Map topics to guide functions
+    knowledge_map = {
+        'wound_care': ('การดูแลแผล', get_wound_care_guide),
+        'ดูแลแผล': ('การดูแลแผล', get_wound_care_guide),
+        'แผล': ('การดูแลแผล', get_wound_care_guide),
+        
+        'physical_therapy': ('กายภาพบำบัด', get_physical_therapy_guide),
+        'กายภาพบำบัด': ('กายภาพบำบัด', get_physical_therapy_guide),
+        'กายภาพ': ('กายภาพบำบัด', get_physical_therapy_guide),
+        'ออกกำลังกาย': ('กายภาพบำบัด', get_physical_therapy_guide),
+        
+        'dvt': ('ป้องกันลิ่มเลือด', get_dvt_prevention_guide),
+        'dvt_prevention': ('ป้องกันลิ่มเลือด', get_dvt_prevention_guide),
+        'ลิ่มเลือด': ('ป้องกันลิ่มเลือด', get_dvt_prevention_guide),
+        'ป้องกันลิ่มเลือด': ('ป้องกันลิ่มเลือด', get_dvt_prevention_guide),
+        
+        'medication': ('การรับประทานยา', get_medication_guide),
+        'ยา': ('การรับประทานยา', get_medication_guide),
+        'ทานยา': ('การรับประทานยา', get_medication_guide),
+        'รับประทานยา': ('การรับประทานยา', get_medication_guide),
+        
+        'warning_signs': ('สัญญาณอันตราย', get_warning_signs_guide),
+        'สัญญาณอันตราย': ('สัญญาณอันตราย', get_warning_signs_guide),
+        'อาการอันตราย': ('สัญญาณอันตราย', get_warning_signs_guide),
+        'อันตราย': ('สัญญาณอันตราย', get_warning_signs_guide),
+    }
+    
+    # If no topic or "menu", return menu
+    if not topic or str(topic).lower() in ['menu', 'เมนู', 'ความรู้', 'knowledge']:
+        result = get_knowledge_menu()
+        return jsonify({"fulfillmentText": result}), 200
+    
+    # Normalize topic
+    topic_key = str(topic).lower().strip()
+    
+    # Find matching guide
+    if topic_key in knowledge_map:
+        topic_name, guide_func = knowledge_map[topic_key]
+        logger.info("Knowledge request: %s", topic_name)
+        result = guide_func()
+        return jsonify({"fulfillmentText": result}), 200
+    
+    # Topic not found
+    return jsonify({
+        "fulfillmentText": (
+            f"ขอโทษค่ะ ไม่พบหัวข้อ '{topic}'\n\n"
+            f"กรุณาพิมพ์ 'ความรู้' เพื่อดูหัวข้อที่มีค่ะ"
+        )
+    }), 200
+
+
 def handle_get_group_id():
     """Handle GetGroupID debug intent"""
     return jsonify({
@@ -200,6 +264,7 @@ def handle_unknown_intent(intent):
             f"คุณสามารถใช้ฟีเจอร์หลักได้:\n"
             f"• รายงานอาการ\n"
             f"• ประเมินความเสี่ยง\n"
-            f"• นัดหมายพยาบาล"
+            f"• นัดหมายพยาบาล\n"
+            f"• ความรู้และคำแนะนำ"
         )
     }), 200
