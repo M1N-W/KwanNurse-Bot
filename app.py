@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-KwanNurse-Bot v3.1 - With Follow-up Reminders (Refactored)
+KwanNurse-Bot v4.0 - COMPLETE! 🎉
 Main Application Entry Point
 
-5 Core Features:
+6/6 Core Features (100%):
   1. ReportSymptoms - AI ประเมินความเสี่ยงจากอาการ
   2. AssessRisk - ประเมินความเสี่ยงส่วนบุคคล
   3. RequestAppointment - จัดการนัดหมายพยาบาล
   4. GetKnowledge - คู่มือความรู้สุขภาพ
-  5. FollowUpReminders - ระบบเตือนติดตามอัตโนมัติ (NEW!)
+  5. FollowUpReminders - ระบบเตือนติดตามอัตโนมัติ
+  6. Teleconsult - ปรึกษาพยาบาลแบบเรียลไทม์ ⭐ NEW!
 
 Refactored for maintainability and scalability.
 """
@@ -36,15 +37,18 @@ except Exception as e:
 
 # Log startup information
 logger.info("=" * 60)
-logger.info("KwanNurse-Bot v3.1 - With Follow-up Reminders")
+logger.info("KwanNurse-Bot v4.0 - COMPLETE!")
 logger.info("=" * 60)
 logger.info("Debug Mode: %s", DEBUG)
-logger.info("Features:")
-logger.info("  1. ReportSymptoms")
-logger.info("  2. AssessRisk")
-logger.info("  3. RequestAppointment")
-logger.info("  4. GetKnowledge")
-logger.info("  5. FollowUpReminders ⭐ NEW")
+logger.info("Features (6/6 - 100%%): ")
+logger.info("  1. ✅ ReportSymptoms")
+logger.info("  2. ✅ AssessRisk")
+logger.info("  3. ✅ RequestAppointment")
+logger.info("  4. ✅ GetKnowledge")
+logger.info("  5. ✅ FollowUpReminders")
+logger.info("  6. ✅ Teleconsult ⭐ NEW")
+logger.info("=" * 60)
+logger.info("🎉 ALL FEATURES COMPLETE!")
 logger.info("=" * 60)
 
 

@@ -26,6 +26,13 @@ from .scheduler import (
     get_scheduler_status,
     reschedule_all_reminders
 )
+from .teleconsult import (
+    is_office_hours,
+    get_category_menu,
+    start_teleconsult,
+    cancel_consultation,
+    get_queue_info_message
+)
 
 __all__ = [
     'send_line_push',
@@ -48,5 +55,10 @@ __all__ = [
     'cancel_reminder_job',
     'get_scheduled_jobs',
     'get_scheduler_status',
-    'reschedule_all_reminders'
+    'reschedule_all_reminders',
+    'is_office_hours',
+    'get_category_menu',
+    'start_teleconsult',
+    'cancel_consultation',
+    'get_queue_info_message'
 ]

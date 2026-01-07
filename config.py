@@ -28,6 +28,8 @@ SHEET_RISK_PROFILE = "RiskProfile"
 SHEET_APPOINTMENTS = "Appointments"
 SHEET_FOLLOW_UP_REMINDERS = "FollowUpReminders"
 SHEET_REMINDER_SCHEDULES = "ReminderSchedules"
+SHEET_TELECONSULT_SESSIONS = "TeleconsultSessions"
+SHEET_TELECONSULT_QUEUE = "TeleconsultQueue"
 
 # LINE Messaging API Configuration
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("CHANNEL_ACCESS_TOKEN")
@@ -105,3 +107,46 @@ NO_RESPONSE_CHECK_HOURS = 24
 # Scheduler Configuration
 SCHEDULER_TIMEZONE = 'Asia/Bangkok'
 SCHEDULER_JOBSTORE = 'default'
+
+# Teleconsult Configuration
+OFFICE_HOURS = {
+    'start': '08:00',
+    'end': '18:00',
+    'weekdays': [0, 1, 2, 3, 4]  # Monday=0 to Friday=4
+}
+
+ISSUE_CATEGORIES = {
+    'emergency': {
+        'name_th': 'ฉุกเฉิน',
+        'priority': 1,
+        'icon': '🚨',
+        'max_wait_minutes': 5
+    },
+    'medication': {
+        'name_th': 'ถามเรื่องยา',
+        'priority': 2,
+        'icon': '💊',
+        'max_wait_minutes': 15
+    },
+    'wound': {
+        'name_th': 'แผลผ่าตัด',
+        'priority': 2,
+        'icon': '🩹',
+        'max_wait_minutes': 15
+    },
+    'appointment': {
+        'name_th': 'นัดหมาย/เอกสาร',
+        'priority': 3,
+        'icon': '📋',
+        'max_wait_minutes': 30
+    },
+    'other': {
+        'name_th': 'อื่นๆ',
+        'priority': 3,
+        'icon': '❓',
+        'max_wait_minutes': 30
+    }
+}
+
+MAX_QUEUE_SIZE = 20
+NURSE_RESPONSE_TIMEOUT_MINUTES = 30

@@ -25,6 +25,14 @@ from services import (
     get_medication_guide,
     get_warning_signs_guide
 )
+from services.teleconsult import (
+    is_office_hours,
+    get_category_menu,
+    parse_category_choice,
+    start_teleconsult,
+    cancel_consultation,
+    get_queue_info_message
+)
 
 logger = get_logger(__name__)
 
@@ -37,9 +45,16 @@ def register_routes(app):
         """Health check endpoint for monitoring services"""
         return jsonify({
             "status": "ok",
-            "service": "KwanNurse-Bot v3.0",
-            "version": "3.0 - Perfect Core (Refactored)",
-            "features": ["ReportSymptoms", "AssessRisk", "RequestAppointment", "GetKnowledge"],
+            "service": "KwanNurse-Bot v4.0",
+            "version": "4.0 - Complete (6/6 Features)",
+            "features": [
+                "ReportSymptoms", 
+                "AssessRisk", 
+                "RequestAppointment", 
+                "GetKnowledge",
+                "FollowUpReminders",
+                "Teleconsult"
+            ],
             "timestamp": datetime.now(tz=LOCAL_TZ).isoformat()
         }), 200
     
@@ -54,6 +69,7 @@ def register_routes(app):
             intent = req.get('queryResult', {}).get('intent', {}).get('displayName')
             params = req.get('queryResult', {}).get('parameters', {}) or {}
             user_id = req.get('session', 'unknown').split('/')[-1]
+            query_text = req.get('queryResult', {}).get('queryText', '')
         except Exception:
             logger.exception("Error parsing request")
             return jsonify({
@@ -75,6 +91,12 @@ def register_routes(app):
         
         elif intent == 'GetKnowledge':
             return handle_get_knowledge(params)
+        
+        elif intent == 'ContactNurse':
+            return handle_contact_nurse(user_id, params, query_text)
+        
+        elif intent == 'CancelConsultation':
+            return handle_cancel_consultation(user_id)
         
         elif intent == 'GetGroupID':
             return handle_get_group_id()
@@ -253,6 +275,76 @@ def handle_get_group_id():
     return jsonify({
         "fulfillmentText": f"🔧 Debug Info:\nNURSE_GROUP_ID: {os.environ.get('NURSE_GROUP_ID', 'Not Set')}"
     }), 200
+
+
+def handle_contact_nurse(user_id, params, query_text):
+    """
+    Handle ContactNurse intent
+    
+    Manages the teleconsult flow including:
+    - Category selection
+    - Queue management
+    - Office hours checking
+    """
+    try:
+        logger.info(f"ContactNurse request from {user_id}")
+        
+        # Check if user provided category or description
+        category_param = params.get('issue_category') or params.get('category')
+        description_param = params.get('description') or params.get('issue_description')
+        
+        # If category is provided (or can be parsed from text)
+        if category_param:
+            issue_type = parse_category_choice(str(category_param))
+        else:
+            # Try to parse from query text
+            issue_type = parse_category_choice(query_text)
+        
+        if issue_type:
+            # Start teleconsult with the category
+            description = str(description_param) if description_param else ""
+            result = start_teleconsult(user_id, issue_type, description)
+            
+            return jsonify({"fulfillmentText": result['message']}), 200
+        
+        else:
+            # No category yet, show menu
+            menu = get_category_menu()
+            
+            # Add office hours info if outside hours
+            if not is_office_hours():
+                from datetime import datetime
+                from config import OFFICE_HOURS
+                now = datetime.now(tz=LOCAL_TZ)
+                current_time = now.strftime("%H:%M")
+                
+                menu = (
+                    f"⏰ ขณะนี้นอกเวลาทำการ ({current_time} น.)\n"
+                    f"เวลาทำการ: {OFFICE_HOURS['start']}-{OFFICE_HOURS['end']} น.\n\n"
+                    f"{menu}\n\n"
+                    f"💡 หากเป็นเรื่องฉุกเฉิน เลือกหมายเลข 1"
+                )
+            
+            return jsonify({"fulfillmentText": menu}), 200
+        
+    except Exception as e:
+        logger.exception(f"Error in ContactNurse: {e}")
+        return jsonify({
+            "fulfillmentText": "เกิดข้อผิดพลาด กรุณาลองใหม่ภายหลัง"
+        }), 200
+
+
+def handle_cancel_consultation(user_id):
+    """Handle cancellation of consultation"""
+    try:
+        result = cancel_consultation(user_id)
+        return jsonify({"fulfillmentText": result['message']}), 200
+        
+    except Exception as e:
+        logger.exception(f"Error cancelling consultation: {e}")
+        return jsonify({
+            "fulfillmentText": "เกิดข้อผิดพลาดในการยกเลิก กรุณาลองใหม่"
+        }), 200
 
 
 def handle_unknown_intent(intent):
